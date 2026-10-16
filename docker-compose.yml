@@ -1,0 +1,44 @@
+services:
+  database:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: insureflow_db
+      MARIADB_USER: insureflow
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:?Set MARIADB_PASSWORD in your shell or .env file}
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?Set MARIADB_ROOT_PASSWORD in your shell or .env file}
+    volumes:
+      - insureflow_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      SPRING_PROFILES_ACTIVE: mariadb
+      SPRING_DATASOURCE_URL: jdbc:mariadb://database:3306/insureflow_db
+      SPRING_DATASOURCE_USERNAME: insureflow
+      SPRING_DATASOURCE_PASSWORD: ${MARIADB_PASSWORD:?Set MARIADB_PASSWORD}
+      INSUREFLOW_SECURITY_USERNAME: ${INSUREFLOW_SECURITY_USERNAME:-portfolio-admin}
+      INSUREFLOW_SECURITY_PASSWORD: ${INSUREFLOW_SECURITY_PASSWORD:?Set INSUREFLOW_SECURITY_PASSWORD in .env}
+      H2_CONSOLE_ENABLED: "false"
+    depends_on:
+      database:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8081:80"
+    restart: unless-stopped
+
+volumes:
+  insureflow_db_data:
